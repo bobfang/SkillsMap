@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<script src="bower_components/d3/d3.min.js"></script>
+<script src="bower_components/topojson/topojson.js"></script>
+<script src="bower_components/datamaps/dist/datamaps.all.min.js"></script>
+<div id="container" style="position: relative; width: 800px; height: 600px;"></div>
+<body>
+    <h3>Solr Search</h3>
+
+    Query: <input id="query" /> 
+    Facet: <input id="facet" value="job_state_c" /> 
+    <button id="search">Search</button>
+    <h3>Map Options</h3>
+    <button id="toggle_cands">Fill w/ Candidates</button>
+    <button id="toggle_appjob">Fill w/ App/Job</button>
+    <button id="toggle_jobs">Fill w/ Jobs</button>
+    <hr/>
+    <div id="results">
+    </div>
+    <div id="text">
+    </div>
+    <h2>Jobs per state</h2>
+    <div id="job_results">
+    </div>
+    <h2>Applicants per job per state</h2>
+    <div id="app_job_state">
+    </div>
+
+</body>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+<script>
+var new_data = {}
+var new_colors = {}
+var jobs_data = {}
+var jobs_colors = {}
+var apps_data = {}
+var candidates_data = {}
+var max = 0;
+var max_candidates = 0;
+var max_jobs = 0;
+
+
+    function on_data(data) {
+        $('#results').empty();
+        $('#text').empty();
+        $('#app_job_state').empty();
+        var colors = d3.hsl(120,0.5,0.5);
+
+        var numFound = 0;
+        var facet = $('#facet').val();
+
+        if (facet == 'job_state_c') {
+        	var docs = data.facet_counts.facet_fields.job_state_c;
+            // TODO: Change this to use the number from the index
+        	numFound = 5249018;
+        } else {
+        	var docs = data.facet_counts.facet_fields.prospect_state;
+        	facet = 'prospect_state';
+            // TODO: Change this to use the number from the index
+        	numFound = 1488722;
+        }
+        	$.each(docs, function(state, i) {
+            	$('#results').prepend($('<div>' + state + ':' + i + '</div>'));
+
+
+
+            	if (isNaN(i)) {
+            		i = 0;
+            	}
+            	if (typeof jobs_data[state] == 'undefined') {
+            		jobs_data[state] = 0;
+            	}
+            	var criteria = i/jobs_data[state];
+            	if (isFinite(criteria)) {
+            		if (criteria > max) {
+            		max = criteria;
+            	}
+            	}
+
+                //check max candidates
+                if (i > max_candidates) {
+                    max_candidates = i;
+                }
+
+        });
+
+        $.each(docs, function(state, i) {
+                if (isNaN(i)) {
+                    i = 0;
+                }
+                if ( jobs_data[state] == 0) {
+                    apps_data[state] = Number.NEGATIVE_INFINITY;
+                } else {
+                    apps_data[state] = i/jobs_data[state];
+                }
+                var color_value = d3.scale.pow()
+                    .domain([0,max])
+                    .range([d3.hsl( 0 ,0.6,0.49), d3.hsl(120 ,0.6,0.49)]);
+            	//colors = d3.hsl(120 * apps_data[state]/max ,0.6,0.49);
+            	new_colors[state] = color_value(apps_data[state]).toString();
+            	new_data[state] = {"candidates": i , "jobs": jobs_data[state] , "app_per_job" : apps_data[state] };
+            	$('#app_job_state').prepend($('<div>' + state + ':' + apps_data[state] + '</div>'));
+                candidates_data[state] = i;
+
+        });
+
+        var total = 'Found ' + data.response.numFound + ' results';
+        $('#results').prepend('<div>' + total + '</div>');
+        election.updateChoropleth(new_data);
+        election.updateChoropleth(new_colors);
+    }
+        function on_data_jobs(data) {
+        $('#job_results').empty();
+        var numFound = 0;
+        var facet = $('#facet').val();
+        var docs = data.facet_counts.facet_fields.job_state;
+        	$.each(docs, function(state, i) {
+            	$('#job_results').prepend($('<div>' + state.toUpperCase() + ':' + i + '</div>'));
+            	jobs_data[state.toUpperCase()] =  i ;
+                //check max jobs
+                if (i > max_jobs) {
+                    max_jobs = i;
+                }
+
+        });
+        var total = 'Found ' + data.response.numFound + ' results';
+        $('#results').prepend('<div>' + total + '</div>');
+    }
+
+    function on_search() {
+        var query = $('#query').val();
+        var facet = $('#facet').val();
+        if (facet == '') {
+        	facet = 'prospect_state';
+        }
+        if (query.length == 0) {
+            return;
+        }
+        //clear globals
+
+        new_data = {};
+        new_colors = {};
+        jobs_data = {};
+        jobs_colors = {};
+        apps_data = {};
+        candidates_data = {};
+        max = 0;
+        max_jobs = 0;
+        max_candidates = 0;
+
+        var url='http://localhost:8983/solr/resumes/select?q='+query+'&fl=id&indent=true&facet=true&facet.field='+facet+'&wt=json&json.nl=map&callback=?&json.wrf=on_data';
+        var job_desc_url='http://localhost:8983/solr/jobdescriptions/select?q='+query+'&fl=id&indent=true&facet=true&facet.field=job_state&wt=json&json.nl=map&callback=?&json.wrf=on_data_jobs';
+        $.getJSON(job_desc_url);
+        $.getJSON(url);
+
+
+        election.updateChoropleth(new_data);
+        election.updateChoropleth(new_colors);
+    }
+
+    function update_colors(criteria) {
+        if (criteria == 'cands') {
+            var color_value = d3.scale.pow()
+                .domain([-10,max_candidates])
+                .range([d3.hsl( 0 ,0.6,0.49), d3.hsl(120 ,0.6,0.49)]);
+
+            for (var i in candidates_data) {
+                    //color_value = d3.hsl(120 * candidates_data[i]/max_candidates ,0.6,0.49);
+                    new_colors[i] = color_value(candidates_data[i]).toString();
+            }
+        } else if (criteria == 'jobs') {
+            var color_value = d3.scale.pow()
+                .domain([0,max_jobs])
+                .range([d3.hsl( 0 ,0.6,0.49), d3.hsl(120 ,0.6,0.49)]);
+            for (var i in jobs_data) {
+                if (typeof new_colors[i] != 'undefined') {
+                    //color_value = d3.hsl(120 * jobs_data[i]/max_jobs ,0.6,0.49);
+                    new_colors[i] = color_value(jobs_data[i]).toString();
+                }
+            }
+        } else if (criteria == 'appjob') {
+            var color_value = d3.scale.pow()
+                .domain([0,max])
+                .range([d3.hsl( 0 ,0.6,0.49), d3.hsl(120 ,0.6,0.49)]);
+            for (var i in apps_data) {
+                    //color_value = d3.hsl(120 * apps_data[i]/max ,0.6,0.49);
+                    new_colors[i] = color_value(apps_data[i]).toString();
+            }
+        }
+        election.updateChoropleth(new_colors);
+    }
+
+    function update_colors_can() {
+        update_colors('cands');
+    }
+
+    function update_colors_jobs() {
+        update_colors('jobs');
+    }
+    function update_colors_appjob() {
+        update_colors('appjob');
+    }
+    function on_ready() {
+        $('#search').click(on_search);
+        /* Hook enter to search */
+        $('body').keypress(function(e) {
+            if (e.keyCode == '13') {
+                on_search();
+            }
+        });
+        //election.updateChoropleth(new_data);
+        //election.updateChoropleth(new_colors);
+        $('#toggle_cands').click(update_colors_can);
+        $('#toggle_jobs').click(update_colors_jobs);
+        $('#toggle_appjob').click(update_colors_appjob);
+    }
+
+    $(document).ready(on_ready);
+
+    var election = new Datamap({
+  scope: 'usa',
+  element: document.getElementById('container'),
+  geographyConfig: {
+
+    highlightBorderColor: '#bada55',
+   popupTemplate: function(geography, data) {
+      return '<div class="hoverinfo"><strong>' + geography.properties.name + '</strong> <br />Number of Candidates:' +  data.candidates + '</strong> <br />Number of Jobs:' +  data.jobs + ' </strong> <br />Number of Applicants per Job (In theory):' +  data.app_per_job + ' </div>'
+    },
+    highlightBorderWidth: 3
+  },
+
+  fills: {
+  'Something': '#CC4731',
+  defaultFill: '#EDDC4E'
+} , data:{}
+});
+election.labels();
+
+</script>

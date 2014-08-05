@@ -1,0 +1,56 @@
+<!-- webapp=/solr path=/dataimport params={optimize=false&indent=true&clean=true&commit=true&verbose=false&command=full-import&debug=false&wt=json&minrun=1000&maxrun=2000} -->
+<dataConfig>
+<dataSource type="JdbcDataSource" driver="com.mysql.jdbc.Driver" url="jdbc:mysql://54.91.55.202/resumator_db" user="reporting" password="u1ZAAngnXa7Zymb6"/>
+    <document name="applicant">
+                <entity name="prospect" query="select prospect_email,prospect_customer_id,concat(prospect_first_name,' ', prospect_last_name) as prospect_name, prospect_first_name, prospect_last_name, prospect_resume_id, DATE_FORMAT(prospect_date_applied,'%Y-%m-%dT%TZ') as prospect_date_applied, pros.id, pros.prospect_id, prospect_city, prospect_location,projob_job_id,projob_rating, job_title, job_country, job_city, job_postal, job_state, meta from dv_prospects pros 
+                JOIN dv_customer_plans p on p.plan_customer_id = pros.prospect_customer_id
+                JOIN dv_customers c on p.plan_customer_id = c.customer_id
+                JOIN dv_resumes_meta r on pros.prospect_resume_id = r.resume
+                join dv_prospects2jobs p2j on p2j.projob_prospect_id = pros.prospect_id
+                join dv_jobs j on p2j.projob_job_id = j.job_id
+                where
+                pros.id between ${dataimporter.request.minrun} and ${dataimporter.request.maxrun}
+                and 
+                pros.id = (select max(pros.id) from dv_prospects as b where pros.prospect_email = b.prospect_email)
+                and
+                (c.customer_is_internal != 1
+                AND p.plan_subscription_status not in (-4,-5,-6))
+                AND c.customer_notes not LIKE '%already%'
+                AND c.customer_notes not LIKE '%spam%'
+                AND c.customer_notes not LIKE '%recruiter%'
+                AND c.customer_notes not LIKE '%fake%'
+                " transformer="RegexTransformer">
+                <field column="id" name="id" sourceColName="pros.id"/>
+                <field column="prospect_id" name="prospect_id" />
+                <field column="prospect_customer_id" name="customer_id" />
+                <field column="prospect_name" name="prospect_name" />
+                <field column="prospect_first_name" name="first_name" />
+                <field column="prospect_last_name" name="last_name" />
+                <field column="prospect_resume_id" name="resume_id" />
+                <field column="prospect_date_applied" name="date_applied" />
+                <field column="prospect_city" name="prospect_city" />
+                <field column="prospect_state" name="prospect_state" regex="(?:(A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|P[AR]|RI|S[CD]|T[NX]|UT|V[AIT]|W[AIVY]))" sourceColName="prospect_location"/>
+                <field column="prospect_postal" name="prospect_postal" regex="(?:(\d{5}(?:[-\s]\d{4})?$))" sourceColName="prospect_location" />
+                <field column="prospect_location" name="prospect_location" />
+                <field column="prospect_email" name="email" />
+
+<!--                <entity name="resumes" query="select meta from dv_resumes_meta where resume='${prospect.prospect_resume_id}'" transformer="RegexTransformer"> -->
+                    <field name="resume_text" column="meta" />
+                    <field column="resume_zip" name="resume_zip" regex="(?:(\d{5}(?:[-\s]\d{4})?))" sourceColName="meta" />
+<!--                </entity>
+                <entity name="jobby" query="select projob_job_id, projob_rating from dv_prospects2jobs where projob_prospect_id='${prospect.prospect_id}'">
+                 -->   <field  column="projob_job_id" name="job_id" />
+                    <field  column="projob_rating" name="projob_rating" />
+                  <!--  <entity name="job_deets" query="select job_title, job_country, job_city, job_state, job_postal from dv_jobs where job_id = '${jobby.projob_job_id}'" transformer="RegexTransformer">
+                      -->  <field column="job_title" name="job_title" />
+                        <field column="job_country" name="job_country" />
+                        <field column="job_city" name="job_city" />
+                        <field column="job_postal" name="job_postal"/>
+                        <field column="job_state" name="job_state"/>
+                        <field column="job_state_c" name="job_state_c" regex="(?:(A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|P[AR]|RI|S[CD]|T[NX]|UT|V[AIT]|W[AIVY]))" sourceColName="job_state" />
+                        <field column="job_postal_c" name="job_postal_c" regex="(?:(\d{5}(?:[-\s]\d{4})?$))" sourceColName="job_postal" />
+                  <!--  </entity>
+                </entity> -->
+            </entity>
+    </document>
+</dataConfig>

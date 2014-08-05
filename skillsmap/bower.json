@@ -1,0 +1,33 @@
+{
+  "name": "datamaps",
+  "version": "0.1.0",
+  "homepage": "https://github.com/bobfang/SkillsMap",
+  "authors": [
+    "Bob Fang <bobfang@gmail.com>"
+  ],
+  "contributors": [
+    
+  ],
+  "description": "Interactive maps for data visualizations with data from Solr",
+  "main": "skillsmap/index.html",
+  "keywords": [
+    "USA",
+    "World",
+    "Map",
+    "Visualization"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests",
+    "public"
+  ],
+  "dependencies": {
+    "d3": "~3.3.8",
+    "topojson": "~1.4.3",
+    "datamaps": "~0.3.3"
+  }
+}
