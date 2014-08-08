@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+.counties {
+  fill: none;
+    stroke: #8a8a8a;
+  stroke-linejoin: round;
+}
+
+
+.states {
+  fill: none;
+  stroke: #000000;
+  stroke-linejoin: round;
+}
+.q0 { fill:rgb(196,196,196); }
+.q0-9 { fill:rgb(247,251,255); }
+.q1-9 { fill:rgb(222,235,247); }
+.q2-9 { fill:rgb(198,219,239); }
+.q3-9 { fill:rgb(158,202,225); }
+.q4-9 { fill:rgb(107,174,214); }
+.q5-9 { fill:rgb(66,146,198); }
+.q6-9 { fill:rgb(33,113,181); }
+.q7-9 { fill:rgb(8,81,156); }
+.q8-9 { fill:rgb(8,48,107); }
+
+
+.q0-20 { fill:  rgb(11,23,83) ; }
+.q1-20 { fill:  rgb(12,27,92) ; }
+.q2-20 { fill:  rgb(12,31,101); }
+.q3-20 { fill:  rgb(12,36,110); }
+.q4-20 { fill:  rgb(13,41,119); }
+.q5-20 { fill:  rgb(13,47,128); }
+.q6-20 { fill:  rgb(12,52,137); }
+.q7-20 { fill:  rgb(12,59,146); }
+.q8-20 { fill:  rgb(12,66,155); }
+.q9-20 { fill:  rgb(12,73,164); }
+.q10-20 { fill:  rgb(11,80,174); }
+.q11-20 { fill:  rgb(10,88,183); }
+.q12-20 { fill:  rgb(9,97,192) ; }
+.q13-20 { fill:  rgb(8,106,201); }
+.q14-20 { fill:  rgb(7,115,210); }
+.q15-20 { fill:  rgb(6,125,219); }
+.q16-20 { fill:  rgb(5,136,228); }
+.q17-20 { fill:  rgb(3,147,237); }
+.q18-20 { fill:  rgb(2,158,246); }
+.q19-20 { fill:  rgb(0,170,255); }
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/queue.v1.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script>
+
+var width = 1600,
+    height = 1000;
+
+var rateById;
+var d;
+var quantize = d3.scale.quantize()
+    .domain([0, 1000])
+    .range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
+
+var projection = d3.geo.albersUsa()
+    .scale(1280)
+    .translate([width / 2, height / 2]);
+
+var path = d3.geo.path()
+    .projection(projection);
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+queue()
+    .defer(d3.json, "us.json")
+    .defer(d3.json, "jobs.json")
+    .await(ready);
+
+
+function pad(num, places) {
+  var zero = places - num.toString().length + 1;
+  return Array(+(zero > 0 && zero)).join("0") + num;
+}
+
+function ready(error, us, jobs) {
+
+      rateById = d3.map(jobs);
+            console.log(rateById.get(22079)); 
+  svg.append("g")
+      .attr("class", "counties")
+    .selectAll("path")
+      .data(topojson.feature(us, us.objects.counties).features)
+    .enter().append("path")
+      .attr("class", function(d) {             console.log(d.id + "" + quantize(rateById.get(pad(d.id, 5)))); 
+        colorkey = quantize(rateById.get(pad(d.id,5) ));
+        if (typeof colorkey != 'undefined') {
+          return colorkey;
+        } else {
+          return "q0";
+        }
+})
+        //return quantize(rateById.get(d.id)); })
+      .attr("d", path);
+  svg.append("path")
+      .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+      .attr("class", "states")
+      .attr("d", path);
+}
+
+d3.select(self.frameElement).style("height", height + "px");
+
+</script>

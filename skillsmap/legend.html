@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+svg {
+  font: 10px sans-serif;
+}
+
+.caption {
+  font-weight: bold;
+}
+
+.key path {
+  display: none;
+}
+
+.key line {
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+.q0-20 { fill:  rgb(11,23,83) `; }
+.q1-20 { fill:  rgb(12,27,92) `; }
+.q2-20 { fill:  rgb(12,31,101); }
+.q3-20 { fill:  rgb(12,36,110); }
+.q4-20 { fill:  rgb(13,41,119); }
+.q5-20 { fill:  rgb(13,47,128); }
+.q6-20 { fill:  rgb(12,52,137); }
+.q7-20 { fill:  rgb(12,59,146); }
+.q8-20 { fill:  rgb(12,66,155); }
+.q9-20 { fill:  rgb(12,73,164); }
+.q10-20 { fill:  rgb(11,80,174); }
+.q11-20 { fill:  rgb(10,88,183); }
+.q12-20 { fill:  rgb(9,97,192) `; }
+.q13-20 { fill:  rgb(8,106,201); }
+.q14-20 { fill:  rgb(7,115,210); }
+.q15-20 { fill:  rgb(6,125,219); }
+.q16-20 { fill:  rgb(5,136,228); }
+.q17-20 { fill:  rgb(3,147,237); }
+.q18-20 { fill:  rgb(2,158,246); }
+.q19-20 { fill:  rgb(0,170,255); }
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script>
+
+var width = 960,
+    height = 500,
+    formatPercent = d3.format(".0%"),
+    formatNumber = d3.format(".0f");
+
+var q = d3.scale.threshold()
+    .domain([.11, .22, .33, .50])
+    .range(["#6e7c5a", "#a0b28f", "#d8b8b3", "#b45554", "#760000"]);
+
+    var threshold = d3.scale.quantize()
+    .domain([0,50,100,150,200,250,300,350,400,450,500,550,600, 1000])
+    .range(['#00FFDD', '#02F8E6', '#03F0EE', '#05DDE9', '#06C9E1', '#08B5DA', '#09A3D3', '#0A92CB', '#0B81C4', '#0C72BC', '#0D64B5', '#0D56AE', '#0E4AA6', '#0E3E9F', '#0F3497', '#0F2A90', '#0F2189', '#0F1981', '#0F127A', '#130F72']);
+
+// A position encoding for the key only.
+var x = d3.scale.linear()
+    .domain([0, 200])
+    .range([0, 240]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom")
+    .tickSize(13)
+    .tickValues(threshold.domain())
+    .tickFormat(function(d) { return d === .5 ? formatPercent(d) : formatNumber(1 * d); });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var g = svg.append("g")
+    .attr("class", "key")
+    .attr("transform", "translate(" + (width - 240) / 2 + "," + height / 2 + ")");
+
+g.selectAll("rect")
+    .data(threshold.range().map(function(color) {
+      var d = threshold.invertExtent(color);
+      if (d[0] == null) d[0] = x.domain()[0];
+      if (d[1] == null) d[1] = x.domain()[1];
+      return d;
+    }))
+  .enter().append("rect")
+    .attr("height", 8)
+    .attr("x", function(d) { return x(d[0]); })
+    .attr("width", function(d) { return x(d[1]) - x(d[0]); })
+    .style("fill", function(d) { return threshold(d[0]); });
+
+g.call(xAxis).append("text")
+    .attr("class", "caption")
+    .attr("y", -6)
+    .text("Percentage of stops that involved force");
+
+</script>

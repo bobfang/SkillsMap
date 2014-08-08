@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+# coding=utf-8
+
+#when indexing, use commit=true&separator=%09&escape=\&header=true
+
 import pycurl
 import json
 import pprint
@@ -21,9 +25,11 @@ port=8983
 solr_jobs_base = 'http://localhost:8983/solr/jobdescriptions'
 solr_resumes_base = 'http://localhost:8983/solr/resumes'
 
-query = '*.*'
+
+query = '-job_fips:[* TO *]'
 s = solr.Solr(solr_jobs_base)
-r = s.select(query, rows=100)
+#(q, fields=None, highlight=None, score=True, sort=None, sort_order="asc", **params)
+r = s.select(query, rows=10000)
 
 
 cols = {'zip' : 1, 'city' : 2, 'state' : 4, 'county': 5}
@@ -38,7 +44,7 @@ def load_file_dict(filename, cols, delim="\t", comment=""):
 			if l[0] == comment: continue
 			data = l.split(delim)
 			line = []
-			lines[data[cols['zip']]] = (data[cols['city']] , data[cols['state']], data[cols['county']])
+			lines[data[cols['zip']]] = (data[cols['city']] , data[cols['state']], "" + data[cols['county']].replace(" County", "").replace("(CA)", "Census Area").replace("\xc3\xb1a An", "n") + " County")
 	return lines
 
 # loads a file into a dictionary
@@ -50,7 +56,7 @@ def load_file_dict_fips(filename, cols, delim=",", comment=""):
 			if l[0] == comment: continue
 			data = l.split(delim)
 			line = []
-			lines[(data[cols['county_name']], data[cols['state']])] = "" + data[cols['state_ansi']] + data[cols['county_ansi']]
+			lines[(data[cols['county_name']] , data[cols['state']])] = "" + data[cols['state_ansi']] + data[cols['county_ansi']]
 	return lines
 
 print(os.path.abspath('../setup/geonames/usa_zip.tsv'))
@@ -60,7 +66,7 @@ fips = load_file_dict_fips(os.path.abspath('../setup/geonames/usa_fips.csv'), fi
 #print(zips)
 #print(fips)
 
-print(zips['55403'])
+print(zips['88011'])
 
 
 new = []
@@ -71,20 +77,38 @@ for job_id in r.results:
 	#print(job_id.get('job_postal', default))
 	#print('%s' % (type(zips[job_id['job_postal'][0]])))
 	line = {}
+	#print(job_id)
+	if (job_id.get('job_postal', default) != "a"):
+		print(job_id['job_postal'])
+		if (zips.get(job_id['job_postal'],default) != "a"):
+			if (zips.get(job_id['job_postal'],default) != (job_id.get('job_city', default), job_id.get('job_state',default), job_id.get('job_county',default))):
+				# try:
+				# 	print('Postal: %s, Old: %s %s New: %s' % (job_id['job_postal'] , job_id['job_city'], job_id['job_state'], zips[job_id['job_postal']]))
+				# except KeyError, e:
+				# 	print('Postal: %s, New: %s %s %s' % (job_id['job_postal'] , zips[job_id['job_postal']], zips[job_id['job_postal']][1] , zips[job_id['job_postal']][2]))
+				#line['job_id'] = job_id['job_id']
+				#line['job_city'] = {"set", zips[job_id['job_postal'][0]][0]}
+				# line['job_city'] =  zips[job_id['job_postal']][0]
+				# line['job_state'] =  zips[job_id['job_postal']][1]
+				# line['job_county'] =  zips[job_id['job_postal']][2]
+				# line['job_fips'] =  fips.get((line['job_county'], line['job_state']), "")
+				# print('FIPS: %s' % (line['job_fips']))
+				job_id['job_city'] =  zips[job_id['job_postal']][0]
+				job_id['job_state'] =  zips[job_id['job_postal']][1]
+				job_id['job_county'] =  zips[job_id['job_postal']][2]
+				job_id['job_fips'] =  fips.get((job_id['job_county'], job_id['job_state']), "")
+				job_id.pop('score')
+				print('FIPS: %s' % (job_id['job_fips']))
+				#print(job_id)
+				a = s.add(job_id, commit=False)
+				#print(a)
 
-	if (job_id.get('job_postal', default) == "a"):
-		if (zips[job_id['job_postal'][0]] != (job_id['job_city'], job_id['job_state'], job_id['job_county'])):
-			print('Postal: %s, Old: %s %s New: %s' % (job_id['job_postal'][0] , job_id['job_city'][0], job_id['job_state'][0], zips[job_id['job_postal'][0]]))
-			line['job_id'] = job_id['job_id']
-			#line['job_city'] = {"set", zips[job_id['job_postal'][0]][0]}
-			line['job_city'] =  zips[job_id['job_postal'][0]][0]
-			line['job_state'] =  zips[job_id['job_postal'][0]][1]
-			line['job_county'] =  zips[job_id['job_postal'][0]][2]
-			s.add(line, commit=True)
-	new.append(line)
 
-print(new)
-
+c = s.commit(wait_flush=True, wait_searcher=True)
+print(c)
+d = s.close()
+print(d)
+print(r.numFound)
 
 # solr_url = 'http://localhost:8983/solr/resumes/dataimport?optimize=false&indent=true&clean=false&commit=true&verbose=false&command=full-import&debug=false&wt=json'
 # base_url = 'http://localhost:8983/solr/resumes/dataimport?'
